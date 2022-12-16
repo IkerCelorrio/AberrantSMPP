@@ -57,7 +57,7 @@ namespace AberrantSMPP
 	{
 		private static readonly global::Common.Logging.ILog _Log = global::Common.Logging.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
 
-		private static readonly uint CHANNEL_BUFFER_SIZE = 1024;
+		private static readonly uint CHANNEL_BUFFER_SIZE = 10240;
 
 		private readonly CancellationTokenSource _cancellator = new CancellationTokenSource();
 		private readonly Random _random = new Random();

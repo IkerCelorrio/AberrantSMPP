@@ -32,14 +32,13 @@ namespace TestClient
 
 		private readonly Dictionary<ConsoleKey, Command> _commands = new();
 		private bool _mustQuit;
-		private bool _enableTls;
 		private int _id = 0;
 		private readonly string _spacer = new('-', 80);
 
 		private ISmppClientAdapter Client => _clients.FirstOrDefault().Value;
 
-		public InteractiveTest(ISmppClientFactory clientFactory)
-			: base(typeof(InteractiveTest), false, clientFactory)
+		public InteractiveTest(ISmppClientFactory clientFactory, bool enableTls)
+			: base(typeof(InteractiveTest), false, clientFactory, enableTls)
 		{
 			SetupCommands();
 		}
@@ -70,11 +69,7 @@ namespace TestClient
 		private void ToggleTls()
 		{
 			_enableTls = !_enableTls;
-			Host = _enableTls ? "smppsims.smsdaemon.test" : "smppsim.smsdaemon.test";
-			Port = _enableTls ? (ushort)15004 : (ushort)12000;
-			SslSupportedProtocols = _enableTls ? SslProtocols.Default | SslProtocols.Tls11 | SslProtocols.Tls12 | SslProtocols.Ssl2 : SslProtocols.None;
-			DisableSslRevocationChecking = true;
-
+			EnableTls(_enableTls);
 			RecreateClients(_clients.Count);
 		}
 

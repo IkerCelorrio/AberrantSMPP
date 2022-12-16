@@ -11,14 +11,14 @@ namespace TestClient
 	{
 		private TimeSpan _timeLimit;
 
-		public TimeLimitedTests(ISmppClientFactory clientFactory)
-			: this(typeof(TimeLimitedTests), clientFactory)
+		public TimeLimitedTests(ISmppClientFactory clientFactory, bool enableTls)
+			: this(typeof(TimeLimitedTests), clientFactory, enableTls)
 		{
 
 		}
 
-		protected TimeLimitedTests(Type declaringType, ISmppClientFactory clientFactory)
-			: base(declaringType, true, clientFactory)
+		protected TimeLimitedTests(Type declaringType, ISmppClientFactory clientFactory, bool enableTls)
+			: base(declaringType, true, clientFactory, enableTls)
 		{
 		}
 
@@ -76,8 +76,20 @@ namespace TestClient
 			(ISmppClientAdapter client, ManualResetEvent startFlag) = ((ISmppClientAdapter client, ManualResetEvent startFlag))state;
 
 			startFlag.WaitOne();
-			foreach (var id in Enumerable.Range(0, int.MaxValue))
-				CreateAndSendSubmitSm(client, id);
+			try
+			{
+				foreach (var id in Enumerable.Range(0, int.MaxValue))
+					CreateAndSendSubmitSm(client, id);
+			}
+			catch (ThreadAbortException)
+			{
+				_log.WarnFormat("Aborted!");
+				LogProgress(-1);
+			}
+			catch (Exception ex)
+			{
+				_log.FatalFormat("Aborted!", ex);
+			}
 		}
 
 		public new void Run(int clients, int workers, int requests)
@@ -88,7 +100,7 @@ namespace TestClient
 		internal void TimeLimitedRun(int clients, int workers, TimeSpan timeLimit)
 		{
 			_timeLimit = timeLimit;
-			base.Run(clients, workers, int.MaxValue);
+			base.Run(clients, workers, timeLimit.Seconds);
 		}
 	}
 }

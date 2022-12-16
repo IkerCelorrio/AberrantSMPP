@@ -43,6 +43,7 @@ namespace TestClient
 		protected readonly Stopwatch _sw = Stopwatch.StartNew();
 		protected readonly TestStatistics _stats;
 
+		protected bool _enableTls = false;
 		private int _textId;
 		private string _testTitle = string.Empty;
 		private List<Thread> _threads = new List<Thread>();
@@ -50,20 +51,30 @@ namespace TestClient
 		public string Host { get; protected set; } = "smppsim.smsdaemon.test";
 		public ushort Port { get; protected set; } = 12000;
 		public SslProtocols SslSupportedProtocols { get; protected set; } = SslProtocols.None;
-		public bool DisableSslRevocationChecking{ get; protected set; } = false;
+		public bool DisableSslRevocationChecking{ get; protected set; } = true;
 
-		public BatchedTests(ISmppClientFactory clientFactory)
-			: this(typeof(BatchedTests), true, clientFactory)
+		public BatchedTests(ISmppClientFactory clientFactory, bool enableTls)
+			: this(typeof(BatchedTests), true, clientFactory, enableTls) 
 		{
 		}
 
-		protected BatchedTests(Type declaringType, bool startClientOnCreate, ISmppClientFactory clientFactory)
+		protected BatchedTests(Type declaringType, bool startClientOnCreate, ISmppClientFactory clientFactory, bool enableTls)
 		{
 			_typeName = declaringType.FullName + "+" + clientFactory.GetType().Name;
 			_log = global::Common.Logging.LogManager.GetLogger(declaringType);
 			_stats = new TestStatistics(_typeName);
 			_startClientOnCreate = startClientOnCreate;
 			_clientFactory = clientFactory;
+			_enableTls = enableTls;
+			EnableTls(enableTls);
+		}
+
+		protected void EnableTls(bool enableTls)
+		{
+			Host = enableTls ? "smppsims.smsdaemon.test" : "smppsim.smsdaemon.test";
+			Port = enableTls ? (ushort)15004 : (ushort)12000;
+			SslSupportedProtocols = enableTls ? SslProtocols.Default | SslProtocols.Tls11 | SslProtocols.Tls12 | SslProtocols.Ssl2 : SslProtocols.None;
+			DisableSslRevocationChecking = true;
 		}
 
 		protected virtual void Configure(ISmppClientAdapter client)
@@ -86,7 +97,7 @@ namespace TestClient
 			client.OnDeliverSmResp += (s, e) => _log.Debug("OnDeliverSmResp: " + e.Response);
 			client.OnEnquireLink += Client_OnEnquireLink;
 			client.OnEnquireLinkResp += (s, e) => _log.Debug("OnEnquireLinkResp: " + e.Response);
-			client.OnError += (s, e) => _log.Debug("OnError: " + e.ThrownException?.ToString());
+			client.OnError += Client_OnError;
 			client.OnGenericNack += (s, e) => _log.Debug("OnGenericNack: " + e.Request);
 			//client.OnQuerySm += (s, e) => _log.Debug("OnQuerySm: " + e.Request);
 			client.OnQuerySmResp += (s, e) => _log.Debug("OnQuerySmResp: " + e.Response);
@@ -100,6 +111,11 @@ namespace TestClient
 			client.OnUnboundResp += (s, e) => _log.Debug("OnUnboundResp: " + e.Response);
 
 			client.Configure();
+		}
+
+		private void Client_OnError(object source, SmppExceptionEventArgs e)
+		{
+			_log.Debug("OnError: " + e.ThrownException?.ToString());
 		}
 
 		protected virtual void Execute(int workers, int requests)
@@ -139,8 +155,8 @@ namespace TestClient
 		private string BuildTitle(int clients, int workers, int requests)
 		{
 			var reqtotal = clients * workers * requests;
-			return string.Format("name:{0}, clients:{1}, workers:{2}, requests:{3} total:{4}",
-				_typeName, clients, workers, requests, reqtotal);
+			return string.Format("name:{0}, clients:{1}, workers:{2}, requests:{3} enableTls:{4}",
+				_typeName, clients, workers, requests, _enableTls);
 		}
 
 		private void BulkSendThreadProc(object state)
@@ -164,12 +180,8 @@ namespace TestClient
 
 		protected void CreateAndSendSubmitSm(ISmppClientAdapter client, int uid)
 		{
-			var txt = @"XXXXXXXXXXX de mas de 160 caractereñ.. @€abcdefghijklmnopqrstxyz!!!0987654321-ABCDE";
-
-			//txt = _texts[_textId];
+			var txt = _texts[_textId];
 			//_textId = ++_textId % _texts.Length;
-			txt = _texts[0];
-			_textId = ++_textId % _texts.Length;
 
 			var requestName = $"{client.SystemId}.{uid:0000000000}";
 			var request = CreateSubmitSm("#" + requestName + " - " + txt); //< Clone and concat clientRequestId to its message
